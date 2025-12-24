@@ -30,6 +30,7 @@ VS Code extensions:
 - **Jupyter** (Microsoft)
 - **Deno** (official: `denoland.vscode-deno`)
 - (Recommended) **Python** (helps VS Code select the `.venv` interpreter)
+- There is a .vscode/settings.json in the repo that sets the necessary extension settings
 
 ---
 
