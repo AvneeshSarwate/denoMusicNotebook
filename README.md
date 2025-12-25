@@ -97,7 +97,10 @@ These are the steps most folks new to Jupyter/VS Code notebooks miss.
 
 In VS Code: **File → Open Folder…** and choose the repo root.
 
-## B) Select the Python interpreter (project venv)
+## B) Activate the uv venv
+run `source .venv/bin/activate` this allows you to pick the Python interpreter installed by uv for this project
+
+## C) Select the Python interpreter (project venv)
 
 This ensures VS Code’s Jupyter integration uses the right environment (the one that has Jupyter installed).
 

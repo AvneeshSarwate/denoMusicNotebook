@@ -104,8 +104,23 @@ function noteDataToAbleton(notes: readonly NoteData[]): AbletonNote[] {
  * When you call `set(name, clip)`, all piano rolls bound to that name
  * will update automatically. Piano roll edits also update the map.
  */
-export class ClipMap extends Map<string, AbletonClip> {
+export class ClipMap {
+  private clips = new Map<string, AbletonClip>()
   private bindings = new Map<string, Set<string>>() // clipName -> Set<sessionId>
+
+  /**
+   * Get a clip by name.
+   */
+  get(name: string): AbletonClip | undefined {
+    return this.clips.get(name)
+  }
+
+  /**
+   * Check if a clip exists.
+   */
+  has(name: string): boolean {
+    return this.clips.has(name)
+  }
 
   /**
    * Set a clip and notify all bound piano rolls.
@@ -114,7 +129,7 @@ export class ClipMap extends Map<string, AbletonClip> {
    * @param options - Optional settings (e.g., excludeSession to prevent echo)
    */
   set(name: string, clip: AbletonClip, options?: { excludeSession?: string }): this {
-    super.set(name, clip)
+    this.clips.set(name, clip)
 
     // Notify all piano rolls bound to this clip name
     const sessions = this.bindings.get(name)
@@ -150,7 +165,59 @@ export class ClipMap extends Map<string, AbletonClip> {
       }
       this.bindings.delete(name)
     }
-    return super.delete(name)
+    return this.clips.delete(name)
+  }
+
+  /**
+   * Get all clip names.
+   */
+  keys(): IterableIterator<string> {
+    return this.clips.keys()
+  }
+
+  /**
+   * Get all clips.
+   */
+  values(): IterableIterator<AbletonClip> {
+    return this.clips.values()
+  }
+
+  /**
+   * Get all [name, clip] entries.
+   */
+  entries(): IterableIterator<[string, AbletonClip]> {
+    return this.clips.entries()
+  }
+
+  /**
+   * Iterate over [name, clip] entries.
+   */
+  [Symbol.iterator](): IterableIterator<[string, AbletonClip]> {
+    return this.clips[Symbol.iterator]()
+  }
+
+  /**
+   * Number of clips in the map.
+   */
+  get size(): number {
+    return this.clips.size
+  }
+
+  /**
+   * Clear all clips and disconnect all piano rolls.
+   */
+  clear(): void {
+    const bridge = getBridge()
+    // Disconnect all sessions
+    for (const sessions of this.bindings.values()) {
+      for (const sessionId of sessions) {
+        const session = bridge.sessions.get(sessionId)
+        session?.client?.disconnect()
+        bridge.sessions.delete(sessionId)
+      }
+    }
+    this.bindings.clear()
+    this.clips.clear()
   }
 
   /**
@@ -194,9 +261,39 @@ declare global {
  */
 function getBridge(): Bridge {
   if (!globalThis.__pianoRollBridge__) {
+    console.log("[PianoRollBridge] Auto-initializing server (first use)...")
     initializeBridge()
   }
   return globalThis.__pianoRollBridge__!
+}
+
+/**
+ * Manually initialize the piano roll bridge server.
+ *
+ * This is optional - the server will auto-initialize on first use.
+ * Calling this explicitly gives you control over when the server starts
+ * and provides visibility into the server URL.
+ *
+ * @returns Bridge info including the base URL
+ */
+export function initializePianoRollBridge(): { baseUrl: string, isNewServer: boolean } {
+  if (globalThis.__pianoRollBridge__) {
+    console.log("[PianoRollBridge] Server already running")
+    return {
+      baseUrl: globalThis.__pianoRollBridge__.baseUrl,
+      isNewServer: false
+    }
+  }
+
+  console.log("[PianoRollBridge] Initializing server...")
+  initializeBridge()
+  const bridge = globalThis.__pianoRollBridge__!
+
+  console.log(`[PianoRollBridge] Server ready at ${bridge.baseUrl}`)
+  return {
+    baseUrl: bridge.baseUrl,
+    isNewServer: true
+  }
 }
 
 /**
@@ -209,7 +306,8 @@ function initializeBridge(): void {
   const moduleDir = new URL(".", import.meta.url).pathname
   const bundlePath = `${moduleDir}copiedHelpers/piano-roll.js`
 
-  // Create HTTP server on ephemeral port
+  // Create HTTP server on ephemeral port (non-blocking, returns immediately)
+  // server.addr is available synchronously even with port: 0
   const server = Deno.serve({
     port: 0,
     onListen: ({ port, hostname }) => {
@@ -314,43 +412,28 @@ function handleEditorRoute(url: URL): Response {
       document.getElementById('name-label').textContent = config.name
     }
 
-    // Load piano roll bundle
-    // NOTE: The bundle structure depends on how piano-roll.js is built.
-    // This template assumes the bundle exports a Vue app factory or component.
-    // You may need to adjust based on your actual bundle structure.
+    // Load piano roll web component bundle
+    // The bundle auto-registers the <piano-roll-component> custom element
+    await import('/static/piano-roll.js')
+
     const wsUrl = \`ws://\${window.location.host}/ws?id=\${sessionId}\`
 
-    // Import Vue and the bundle
-    const module = await import('/static/piano-roll.js')
-
-    // Try to mount the piano roll
-    // The exact mounting code depends on your bundle structure:
-    // - If it's a web component, use createElement
-    // - If it's a Vue component, use createApp
-    // - If it's an app factory, call it directly
+    // Wait for custom element to be defined, then create and mount it
+    await customElements.whenDefined('piano-roll-component')
 
     const rootEl = document.getElementById('root')
-    rootEl.innerHTML = \`
-      <div>
-        <p>Piano roll component loading failed.</p>
-        <p>Please verify the piano-roll.js bundle exports correctly.</p>
-        <p>Expected: Vue app with PianoRollRoot component</p>
-        <p>Session: \${sessionId}</p>
-        <p>WebSocket URL: \${wsUrl}</p>
-      </div>
-    \`
+    const pianoRoll = document.createElement('piano-roll-component')
 
-    // TODO: Update this section once bundle structure is verified
-    // Example for Vue 3 SFC:
-    // const { createApp } = await import('https://unpkg.com/vue@3/dist/vue.esm-browser.js')
-    // const app = createApp(module.PianoRollRoot, {
-    //   wsAddress: wsUrl,
-    //   interactive: config.interactive,
-    //   showControlPanel: true,
-    //   width: 640,
-    //   height: 360
-    // })
-    // app.mount('#root')
+    // Set attributes based on session config
+    pianoRoll.setAttribute('ws-address', wsUrl)
+    pianoRoll.setAttribute('interactive', config.interactive.toString())
+    pianoRoll.setAttribute('show-control-panel', 'true')
+    pianoRoll.setAttribute('width', '640')
+    pianoRoll.setAttribute('height', '360')
+
+    rootEl.appendChild(pianoRoll)
+
+    console.log('[Piano Roll] Mounted successfully', { sessionId, wsUrl, config })
   </script>
 </body>
 </html>`
@@ -490,12 +573,13 @@ function displayIframe(sessionId: string): void {
 
   // Use Deno.jupyter.html tagged template
   // @ts-ignore - Deno.jupyter is only available in notebook context
-  Deno.jupyter.html`<iframe
+  const view =Deno.jupyter.html`<iframe
     src="${url}"
     width="680"
     height="460"
     style="border: 1px solid #ccc; border-radius: 8px; background: white;"
   ></iframe>`
+  Deno.jupyter.display(view)
 }
 
 /**

@@ -5,8 +5,37 @@
  * in Deno Jupyter notebooks.
  */
 
-import { clipMap, showMelody, showBoundMelody, PianoRollHandle } from "./pianoRollBridge.ts"
+import {
+  clipMap,
+  showMelody,
+  showBoundMelody,
+  PianoRollHandle,
+  initializePianoRollBridge
+} from "./pianoRollBridge.ts"
 import { AbletonClip, quickNote } from "./copiedHelpers/AbletonClip.ts"
+
+// ============================================================================
+// Example 0: Optional Header Cell - Explicit Server Initialization
+// ============================================================================
+
+// OPTIONAL: Initialize the server explicitly in a header cell
+// This gives you visibility into when the server starts and what port it uses.
+// If you skip this, the server will auto-initialize on first piano roll display.
+
+const serverInfo = initializePianoRollBridge()
+console.log("Piano Roll Server URL:", serverInfo.baseUrl)
+console.log("Is new server:", serverInfo.isNewServer)
+
+// Output example:
+// [PianoRollBridge] Initializing server...
+// [PianoRollBridge] Server running at http://127.0.0.1:54321
+// Piano Roll Server URL: http://127.0.0.1:54321
+// Is new server: true
+
+// If you re-run this cell:
+// [PianoRollBridge] Server already running
+// Piano Roll Server URL: http://127.0.0.1:54321
+// Is new server: false
 
 // ============================================================================
 // Example 1: Display a read-only piano roll
@@ -223,28 +252,44 @@ setTimeout(() => {
 }, 30000)
 
 // ============================================================================
-// Notes on Bundle Structure
+// Implementation Notes
 // ============================================================================
 
 /**
- * IMPORTANT: The HTML template in pianoRollBridge.ts currently has placeholder
- * code for mounting the piano roll component. You need to:
+ * SERVER INITIALIZATION:
  *
- * 1. Verify how your piano-roll.js bundle exports the component
- * 2. Update the HTML template's mounting code accordingly
+ * The HTTP/WebSocket server can be initialized in two ways:
  *
- * Common patterns:
+ * 1. Automatic (default):
+ *    - Server auto-starts on first call to showMelody() or showBoundMelody()
+ *    - Console log: "[PianoRollBridge] Auto-initializing server (first use)..."
  *
- * - Web Component:
- *   customElements.define('piano-roll', PianoRollComponent)
- *   const el = document.createElement('piano-roll')
- *   el.setAttribute('ws-address', wsUrl)
+ * 2. Explicit (recommended):
+ *    - Call initializePianoRollBridge() in a header cell
+ *    - Gives you the server URL and control over initialization timing
+ *    - Useful for debugging and avoiding delays on first piano roll display
  *
- * - Vue App Factory:
- *   const app = createApp(PianoRollRoot, { wsAddress: wsUrl, ... })
- *   app.mount('#root')
+ * The server singleton survives cell re-runs via globalThis.__pianoRollBridge__.
  *
- * - Direct Export:
- *   const { mount } = await import('/static/piano-roll.js')
- *   mount('#root', { wsAddress: wsUrl, ... })
+ * ---
+ *
+ * WEB COMPONENT STRUCTURE:
+ *
+ * The piano-roll.js bundle is a web component that auto-registers itself
+ * as <piano-roll-component> when loaded. It accepts these attributes:
+ *
+ * - ws-address: WebSocket URL for bidirectional sync
+ * - interactive: "true" | "false" - whether editing is enabled
+ * - show-control-panel: "true" | "false" - show UI controls
+ * - width: pixel width
+ * - height: pixel height
+ *
+ * The component provides these methods (when not using WebSocket):
+ * - setNotes(notes): Set notes array
+ * - fitZoomToNotes(): Auto-zoom to show all notes
+ * - getPlayStartPosition(): Get queue playhead position
+ * - setLivePlayheadPosition(pos): Set live playhead for visualization
+ *
+ * When using WebSocket (as in this bridge), the component handles
+ * bidirectional sync automatically via the ws-address attribute.
  */
