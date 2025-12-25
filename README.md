@@ -25,6 +25,7 @@ This repo is set up so you can:
 - `uv` installed and on `PATH`
 - `deno` installed and on `PATH`
 - VS Code installed
+- Rust (and cargo) installed
 
 VS Code extensions:
 - **Jupyter** (Microsoft)
@@ -36,7 +37,7 @@ VS Code extensions:
 
 # One-time setup (do this once per machine/user OR when rebuilding the environment)
 
-## 1) Create the project venv with uv + install Jupyter
+## 1a) Create the project venv with uv + install Jupyter
 
 From the repo root:
 
@@ -44,9 +45,17 @@ From the repo root:
 uv python install 3.12
 uv venv --seed
 uv pip install jupyterlab
-````
+```
 
 This creates `./.venv/` and installs Jupyter into it.
+
+## 1b) (Optional) Build the Rust backed fast_sleep helper library
+
+From the repo root:
+
+```bash
+cargo build --release --manifest-path native/fastsleep/Cargo.toml
+```
 
 ## 2) Install the Deno Jupyter kernel
 
