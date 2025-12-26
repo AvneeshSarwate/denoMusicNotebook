@@ -63,17 +63,62 @@ export interface PianoRollHandle {
 // Note Conversion Functions
 // ============================================================================
 
+const PIANO_ROLL_ID_KEY = '__pianoRollId'
+const PIANO_ROLL_DATA_KEY = '__pianoRollMetadata'
+
+function generatePianoRollId(index: number): string {
+  return `note_${Date.now()}_${index}_${Math.random().toString(36).slice(2, 9)}`
+}
+
+function normalizeMetadataWithId(metadata: unknown, id: string): Record<string, unknown> {
+  if (metadata && typeof metadata === 'object') {
+    return { ...(metadata as Record<string, unknown>), [PIANO_ROLL_ID_KEY]: id }
+  }
+  if (metadata === undefined) {
+    return { [PIANO_ROLL_ID_KEY]: id }
+  }
+  return {
+    [PIANO_ROLL_ID_KEY]: id,
+    [PIANO_ROLL_DATA_KEY]: metadata
+  }
+}
+
+function ensureStableNoteId(note: AbletonNote, index: number): string {
+  const metadata = note.metadata
+  if (metadata && typeof metadata === 'object') {
+    const existing = (metadata as Record<string, unknown>)[PIANO_ROLL_ID_KEY]
+    if (typeof existing === 'string' && existing.length > 0) {
+      return existing
+    }
+  }
+
+  const id = generatePianoRollId(index)
+  if (metadata && typeof metadata === 'object') {
+    ;(metadata as Record<string, unknown>)[PIANO_ROLL_ID_KEY] = id
+  } else if (metadata === undefined) {
+    note.metadata = { [PIANO_ROLL_ID_KEY]: id }
+  } else {
+    note.metadata = {
+      [PIANO_ROLL_ID_KEY]: id,
+      [PIANO_ROLL_DATA_KEY]: metadata
+    }
+  }
+
+  return id
+}
+
 /**
  * Convert AbletonNote array to piano roll NoteDataInput format.
  * Generates unique IDs for each note.
  */
 function abletonToNoteData(notes: AbletonNote[]): NoteDataInput[] {
   return notes.map((note, index) => ({
-    id: `note_${Date.now()}_${index}_${Math.random().toString(36).slice(2, 9)}`,
+    id: ensureStableNoteId(note, index),
     pitch: note.pitch,
     position: note.position,
     duration: note.duration,
-    velocity: note.velocity
+    velocity: note.velocity,
+    metadata: note.metadata
   }))
 }
 
@@ -90,7 +135,7 @@ function noteDataToAbleton(notes: readonly NoteData[]): AbletonNote[] {
     offVelocity: note.velocity, // Default: same as velocity
     probability: 1,              // Default: always play
     isEnabled: true,             // Default: enabled
-    metadata: note.metadata
+    metadata: normalizeMetadataWithId(note.metadata, note.id)
   }))
 }
 
@@ -523,7 +568,10 @@ function handleWebSocket(
   }
 
   // Handle note updates from piano roll (only for bound sessions)
-  client.onNotesUpdate = (notesMap) => {
+  client.onNotesUpdate = (notesMap, source) => {
+    if (source && source !== 'notes') {
+      return
+    }
     if (session.type === 'bound') {
       const notes = Array.from(notesMap.values())
       const abletonNotes = noteDataToAbleton(notes)
