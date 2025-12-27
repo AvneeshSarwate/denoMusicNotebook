@@ -44,6 +44,21 @@
  *    - OfflineRunner can step time or frames and run the same timed code without wall-clock delays.
  *
  *
+ * Environment Differences
+ * -----------------------
+ * Observed: the cancellation test "noteoff_handleCancel_guaranteed_on_cancel"
+ * behaves differently in Chrome vs Deno if .finally() is used instead of handleCancel():
+ * it passes in Chrome but fails in Deno due to how cancellations surface.
+ *
+ * AI guessed root cause: Promise.finally creates a new promise that rejects when the
+ * task is canceled. In Chrome this often only logs a warning, but in Deno it is
+ * treated as an unhandled rejection, which fails the test.
+ *
+ * Workaround: avoid Promise.finally for cancel-only cleanup. Use handleCancel(...)
+ * on the returned task handle (or attach a .catch to the finally promise) to prevent
+ * unhandled rejections and keep cancellation cleanup deterministic.
+ *
+ *
  * Capabilities / Public API Summary
  * --------------------------------
  * - launch(fn): create a root DateTimeContext in realtime (setTimeout-only, works everywhere).
@@ -125,7 +140,7 @@
  * - Creates a new child context whose initial time is root.mostRecentDescendentTime (align to global).
  * - Runs fn(childCtx) concurrently.
  * - Does NOT update parentCtx.time when the branch finishes.
- * - Returns a handle with cancel() and finally().
+ * - Returns a handle with cancel(), finally(), and handleCancel().
  *
  * branchWait(fn):
  * - Creates a new child context whose initial time is parentCtx.time.
@@ -397,6 +412,32 @@ export class CancelablePromiseProxy<T> implements Promise<T> {
   public cancel() {
     this.abortController.abort();
     this.timeContext?.cancel();
+  }
+
+  /**
+   * Register a handler that runs when this task is canceled (AbortController aborts).
+   * Returns an unsubscribe function. If already canceled, the handler fires immediately.
+   */
+  public handleCancel(onCancel?: (() => void) | undefined | null): () => void {
+    if (!onCancel) return () => {};
+
+    const signal = this.abortController.signal;
+    let called = false;
+
+    const wrapped = () => {
+      if (called) return;
+      called = true;
+      signal.removeEventListener("abort", wrapped);
+      onCancel();
+    };
+
+    if (signal.aborted) {
+      wrapped();
+      return () => {};
+    }
+
+    signal.addEventListener("abort", wrapped);
+    return () => signal.removeEventListener("abort", wrapped);
   }
 
   [Symbol.toStringTag] = "[object CancelablePromiseProxy]";
@@ -1477,7 +1518,11 @@ export abstract class TimeContext {
     this.childContexts.forEach((ctx) => ctx.cancel());
   }
 
-  public branch<T>(block: (ctx: TimeContext) => Promise<T>, debugName = "", opts?: BranchOptions): { cancel: () => void; finally: (f: () => void) => void } {
+  public branch<T>(
+    block: (ctx: TimeContext) => Promise<T>,
+    debugName = "",
+    opts?: BranchOptions,
+  ): { cancel: () => void; finally: (f: () => void) => void; handleCancel: (f: () => void) => () => void } {
     const promise = createAndLaunchContext(
       block,
       this.rootContext!.mostRecentDescendentTime,
@@ -1490,6 +1535,7 @@ export abstract class TimeContext {
     return {
       finally: (finalFunc: () => void) => promise.finally(finalFunc),
       cancel: () => promise.cancel(),
+      handleCancel: (cancelFunc: () => void) => promise.handleCancel(cancelFunc),
     };
   }
 
