@@ -50,13 +50,16 @@
  * behaves differently in Chrome vs Deno if .finally() is used instead of handleCancel():
  * it passes in Chrome but fails in Deno due to how cancellations surface.
  *
- * AI guessed root cause: Promise.finally creates a new promise that rejects when the
- * task is canceled. In Chrome this often only logs a warning, but in Deno it is
- * treated as an unhandled rejection, which fails the test.
+ * Known / intentional runtime behavior: Promise.finally creates a new promise that
+ * rejects when the task is canceled. Browsers typically only log unhandled rejections,
+ * while server runtimes (Deno, Node, Bun) often treat them as fatal by default.
+ * So the difference is policy, not a bug in the engine.
  *
- * Workaround: avoid Promise.finally for cancel-only cleanup. Use handleCancel(...)
+ * Fix: avoid Promise.finally for cancel-only cleanup. Use handleCancel(...)
  * on the returned task handle (or attach a .catch to the finally promise) to prevent
  * unhandled rejections and keep cancellation cleanup deterministic.
+ * 
+ * This difference can be seen running finally_test.ts in different environemnts.
  *
  *
  * Capabilities / Public API Summary
