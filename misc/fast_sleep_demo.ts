@@ -1,5 +1,5 @@
 // demo.ts
-import { configureFastSleep, fastSleep } from "./fast_sleep.ts";
+import { configureFastSleep, fastSleep } from "../tools/fast_sleep.ts";
 
 configureFastSleep({ nativeAccuracyUs: 200, strategy: "yield" });
 // Try: strategy: "spin" if you want tighter jitter at higher CPU.

@@ -2,7 +2,7 @@
 type Strategy = "default" | "yield" | "spin";
 
 function dylibUrl(): URL {
-  const base = new URL("./native/fastsleep/target/release/", import.meta.url);
+  const base = new URL("../native/fastsleep/target/release/", import.meta.url);
 
   // Cargo output names differ slightly on Windows; try both.
   const os = Deno.build.os;

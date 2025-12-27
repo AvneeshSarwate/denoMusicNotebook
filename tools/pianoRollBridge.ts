@@ -23,8 +23,8 @@ import {
   PianoRollWebSocketClient,
   type NoteDataInput,
   type NoteData
-} from "./copiedHelpers/pianoRollWebSocketClient.ts"
-import { AbletonClip, type AbletonNote } from "./copiedHelpers/AbletonClip.ts"
+} from "../copiedHelpers/pianoRollWebSocketClient.ts"
+import { AbletonClip, type AbletonNote } from "../copiedHelpers/AbletonClip.ts"
 
 // ============================================================================
 // Type Definitions
@@ -45,7 +45,7 @@ interface Bridge {
   server: Deno.HttpServer
   baseUrl: string
   sessions: Map<string, SessionData>
-  bundlePath: string
+  bundleUrl: URL
 }
 
 export interface PianoRollHandle {
@@ -348,8 +348,7 @@ function initializeBridge(): void {
   const sessions = new Map<string, SessionData>()
 
   // Resolve bundle path relative to this module
-  const moduleDir = new URL(".", import.meta.url).pathname
-  const bundlePath = `${moduleDir}copiedHelpers/piano-roll.js`
+  const bundleUrl = new URL("../copiedHelpers/piano-roll.js", import.meta.url)
 
   // Create HTTP server on ephemeral port (non-blocking, returns immediately)
   // server.addr is available synchronously even with port: 0
@@ -376,7 +375,7 @@ function initializeBridge(): void {
     }
 
     if (url.pathname === "/static/piano-roll.js") {
-      return handleBundleRoute(bundlePath)
+      return handleBundleRoute(bundleUrl)
     }
 
     if (url.pathname === "/config") {
@@ -394,7 +393,7 @@ function initializeBridge(): void {
     server,
     baseUrl,
     sessions,
-    bundlePath
+    bundleUrl
   }
 }
 
@@ -491,9 +490,9 @@ function handleEditorRoute(url: URL): Response {
 /**
  * Serve the piano roll bundle.
  */
-async function handleBundleRoute(bundlePath: string): Promise<Response> {
+async function handleBundleRoute(bundleUrl: URL): Promise<Response> {
   try {
-    const file = await Deno.readFile(bundlePath)
+    const file = await Deno.readFile(bundleUrl)
     return new Response(file, {
       headers: { "Content-Type": "application/javascript; charset=utf-8" }
     })

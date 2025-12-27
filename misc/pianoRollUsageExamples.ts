@@ -11,8 +11,8 @@ import {
   showBoundMelody,
   PianoRollHandle,
   initializePianoRollBridge
-} from "./pianoRollBridge.ts"
-import { AbletonClip, quickNote } from "./copiedHelpers/AbletonClip.ts"
+} from "../tools/pianoRollBridge.ts"
+import { AbletonClip, quickNote } from "../copiedHelpers/AbletonClip.ts"
 
 // ============================================================================
 // Example 0: Optional Header Cell - Explicit Server Initialization
@@ -213,7 +213,7 @@ setTimeout(() => {
 // Example 9: Using with algorithmic composition
 // ============================================================================
 
-import { launch } from "./copiedHelpers/offline_time_context.ts"
+import { launch } from "../copiedHelpers/offline_time_context.ts"
 
 // Generate notes algorithmically
 function generatePattern(startPitch: number, length: number): AbletonClip {
