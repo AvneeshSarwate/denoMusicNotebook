@@ -196,6 +196,48 @@ type MPENoteUpdate = {
 type MPENoteEnd = { channel: number; noteNum: number; velocity: number };
 ```
 
+### MPE Device (output, with voice allocation)
+
+`MPEDevice` manages per-note MPE channels and returns a note handle you can mutate.
+
+```ts
+import { MidiAccess, MPEDevice } from "./midi/mod.ts";
+
+const midi = MidiAccess.open();
+const output = midi.openOutput(midi.listOutputs()[0].id);
+
+const mpeDevice = new MPEDevice(output, { zone: "lower" });
+
+const note = mpeDevice.noteOn(60, 100, 0, 40, 64);
+note?.pitchBend(512);
+note?.timbre(74);
+note?.pressure(80);
+
+// Either of these turns the note off:
+note?.noteOff();
+mpeDevice.noteOff(60);
+```
+
+`MPEDeviceConfig`:
+
+```ts
+type MPEDeviceConfig = {
+  zone: "lower" | "upper";
+  masterChannel?: number;
+  memberChannels?: [number, number];
+  timbreCC?: number;
+  noteOffVelocity?: number;
+  overflow?: "oldest" | "none";
+};
+```
+
+`noteOn()` returns `MPENoteRef | null`. When all member channels are in use:
+
+- `overflow: "oldest"` (default) steals the oldest active note.
+- `overflow: "none"` returns `null` and sends nothing.
+
+`MPENoteRef` methods (`pitchBend`, `pressure`, `timbre`, `noteOff`) become no-ops once the note is off.
+
 ## Coalescing semantics
 
 - CC / pitch bend / pressure / program change are coalesced per channel/key, “latest wins” per dispatch tick.
