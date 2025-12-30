@@ -57,7 +57,17 @@ From the repo root:
 cargo build --release --manifest-path native/fastsleep/Cargo.toml
 ```
 
-## 1c) Cache Deno dependencies
+## 1c) Build the MIDI bridge native library
+
+From the repo root:
+
+```bash
+./scripts/build_midi_bridge.sh
+```
+
+This copies the compiled library into `./native/` for Deno FFI to load.
+
+## 1d) Cache Deno dependencies
 
 Install/cache all Deno dependencies (including npm packages) from `deno.json`:
 
