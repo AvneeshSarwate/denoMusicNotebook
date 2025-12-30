@@ -1408,6 +1408,19 @@ export function awaitBarrier(key: string, ctx: TimeContext): Promise<void> {
 /* ---------------------------------------------------------------------------------------------- */
 
 let contextId = 0;
+const rootContexts: Set<TimeContext> = new Set();
+
+export function cancelAllContexts() {
+  const roots = Array.from(rootContexts);
+  for (const ctx of roots) {
+    try {
+      ctx.cancel();
+    } catch {
+      // best-effort cancel; ignore unexpected errors
+    }
+  }
+  rootContexts.clear();
+}
 
 export type BranchOptions = {
   tempo?: "shared" | "cloned"; // default shared
@@ -1656,6 +1669,13 @@ export function createAndLaunchContext<T, C extends TimeContext>(
     const err = e as Error;
     console.log("promise catch error", err, err?.message, err?.stack);
   });
+
+  if (!parentContext) {
+    rootContexts.add(newContext);
+    const cleanupRoot = () => rootContexts.delete(newContext);
+    promiseProxy.handleCancel(cleanupRoot);
+    promiseProxy.finally(cleanupRoot);
+  }
 
   if (parentContext) {
     bp.finally(() => {

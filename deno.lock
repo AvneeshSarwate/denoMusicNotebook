@@ -3,7 +3,8 @@
   "specifiers": {
     "jsr:@std/assert@1": "1.0.16",
     "jsr:@std/internal@^1.0.12": "1.0.12",
-    "jsr:@std/random@~0.1.4": "0.1.4"
+    "jsr:@std/random@~0.1.4": "0.1.4",
+    "npm:node-osc@^9.1.0": "9.1.7"
   },
   "jsr": {
     "@std/assert@1.0.16": {
@@ -19,10 +20,28 @@
       "integrity": "91407b5c30d63b6570e5d7be8b341bf5941c55d5c6d6b9569a220b63ae03e2d9"
     }
   },
+  "npm": {
+    "binpack@0.1.0": {
+      "integrity": "sha512-KcSrsGiIKgklTWweVb9XnZPWO1/rGSsK3fwR7VnbDPbLKPlkvSKd/ZrJ1W712r6HzH5u0fa/AZCftATO09x8Aw=="
+    },
+    "node-osc@9.1.7": {
+      "integrity": "sha512-7zKoV+125AfZuDVoEKvCzAoBfqIAewf6SyI7PguB9coU+Kye6nncjeKmb3lIQUeOJHec7Ym3IUG/wzy+iXgp6Q==",
+      "dependencies": [
+        "osc-min"
+      ]
+    },
+    "osc-min@1.1.2": {
+      "integrity": "sha512-8DbiO8ME85R75stgNVCZtHxB9MNBBNcyy+isNBXrsFeinXGjwNAauvKVmGlfRas5VJWC/mhzIx7spR2gFvWxvg==",
+      "dependencies": [
+        "binpack"
+      ]
+    }
+  },
   "workspace": {
     "dependencies": [
       "jsr:@std/assert@1",
-      "jsr:@std/random@~0.1.4"
+      "jsr:@std/random@~0.1.4",
+      "npm:node-osc@^9.1.0"
     ]
   }
 }

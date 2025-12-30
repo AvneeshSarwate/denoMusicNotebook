@@ -57,6 +57,22 @@ From the repo root:
 cargo build --release --manifest-path native/fastsleep/Cargo.toml
 ```
 
+## 1c) Cache Deno dependencies
+
+Install/cache all Deno dependencies (including npm packages) from `deno.json`:
+
+```bash
+deno install
+```
+
+Or use the provided task:
+
+```bash
+deno task install
+```
+
+This downloads and caches packages like `node-osc` and other dependencies.
+
 ## 2) Install the Deno Jupyter kernel
 
 You must run this at least once so Jupyter/VSC can see the Deno kernel.
