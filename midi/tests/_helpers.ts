@@ -7,9 +7,8 @@ export type LoopbackPair = {
 };
 
 export function openMidi(libPath?: string) {
-  const path = libPath ?? "./native/libmidi_bridge.dylib";
-  const midi = MidiAccess.open({ libPath: path });
-  return { midi, libPath: path };
+  const midi = MidiAccess.open(libPath ? { libPath } : {});
+  return { midi, libPath };
 }
 
 export function pickLoopback(inputs: PortInfo[], outputs: PortInfo[]): LoopbackPair {

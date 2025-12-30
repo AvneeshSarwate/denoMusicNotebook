@@ -65,7 +65,7 @@ From the repo root:
 ./scripts/build_midi_bridge.sh
 ```
 
-This copies the compiled library into `./native/` for Deno FFI to load.
+This builds the native library into `./native/midi_bridge/target/release/` for Deno FFI to load.
 
 ## 1d) Cache Deno dependencies
 

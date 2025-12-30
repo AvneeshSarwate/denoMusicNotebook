@@ -10,14 +10,14 @@ From the repo root:
 ./scripts/build_midi_bridge.sh
 ```
 
-The built library is copied to `./native/libmidi_bridge.dylib` (macOS), `.so` (Linux), or `.dll` (Windows).
+The built library is produced under `./native/midi_bridge/target/release/` and auto-discovered at runtime.
 
 ## Quick start
 
 ```ts
 import { MidiAccess } from "./midi/mod.ts";
 
-const midi = MidiAccess.open({ libPath: "./native/libmidi_bridge.dylib" });
+const midi = MidiAccess.open();
 
 const inputs = midi.listInputs();
 const outputs = midi.listOutputs();
@@ -49,10 +49,16 @@ deno run --allow-ffi --allow-read your_script.ts
 ### MidiAccess
 
 ```ts
-const midi = MidiAccess.open({ libPath });
+const midi = MidiAccess.open();
 ```
 
-- `MidiAccess.open(options: { libPath: string }): MidiAccess`
+If you need a custom build path, pass `libPath`:
+
+```ts
+const midi = MidiAccess.open({ libPath: "/absolute/path/to/libmidi_bridge.dylib" });
+```
+
+- `MidiAccess.open(options?: { libPath?: string }): MidiAccess`
 - `listInputs(): PortInfo[]`
 - `listOutputs(): PortInfo[]`
 - `openInput(portId: string, options?: MidiInputOptions): MidiInput`

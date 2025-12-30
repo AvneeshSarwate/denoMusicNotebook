@@ -5,6 +5,8 @@ export const CALLBACK_DEF = {
   result: "void",
 } as const;
 
+export type MidiCallback = Deno.UnsafeCallback<typeof CALLBACK_DEF>;
+
 export const FFI_SYMBOLS = {
   midi_list_inputs: { parameters: ["pointer", "u32"], result: "u32" },
   midi_list_outputs: { parameters: ["pointer", "u32"], result: "u32" },
@@ -24,8 +26,35 @@ export type MidiBridgeLibrary = Deno.DynamicLibrary<MidiBridgeSymbols>;
 const textDecoder = new TextDecoder();
 const textEncoder = new TextEncoder();
 
-export function openLibrary(libPath: string): MidiBridgeLibrary {
-  return Deno.dlopen(libPath, FFI_SYMBOLS);
+function defaultLibUrl(): URL {
+  const base = new URL("../native/midi_bridge/target/release/", import.meta.url);
+  const os = Deno.build.os;
+  const candidates =
+    os === "windows"
+      ? ["midi_bridge.dll", "libmidi_bridge.dll"]
+      : os === "darwin"
+      ? ["libmidi_bridge.dylib"]
+      : ["libmidi_bridge.so"];
+
+  for (const name of candidates) {
+    const u = new URL(name, base);
+    try {
+      const t = Deno.dlopen(u, FFI_SYMBOLS);
+      t.close();
+      return u;
+    } catch {
+      // try next
+    }
+  }
+
+  throw new Error(
+    `Could not find native midi_bridge library in ${base.toString()} (tried ${candidates.join(", ")})`,
+  );
+}
+
+export function openLibrary(libPath?: string): MidiBridgeLibrary {
+  const path = libPath ? libPath : defaultLibUrl();
+  return Deno.dlopen(path, FFI_SYMBOLS);
 }
 
 export function readPortList(

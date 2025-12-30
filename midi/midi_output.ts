@@ -17,8 +17,8 @@ export class MidiOutput {
   }
 
   send(bytes: Uint8Array | number[]) {
-    const buf = bytes instanceof Uint8Array ? bytes : Uint8Array.from(bytes);
-    const ptr = Deno.UnsafePointer.of(buf);
+    const buf = bytes instanceof Uint8Array ? new Uint8Array(bytes) : Uint8Array.from(bytes);
+    const ptr = Deno.UnsafePointer.of(buf as Uint8Array<ArrayBuffer>);
     this.#lib.symbols.midi_send(this.#handle, ptr, buf.length);
   }
 

@@ -8,7 +8,7 @@ import {
   MAGIC,
   VERSION,
 } from "./decode.ts";
-import type { MidiBridgeLibrary } from "./ffi.ts";
+import type { MidiBridgeLibrary, MidiCallback } from "./ffi.ts";
 import type {
   CCEvent,
   ChannelPressureEvent,
@@ -34,7 +34,7 @@ type Listener<T> = (event: T) => void;
 export class MidiInput {
   #lib: MidiBridgeLibrary;
   #handle: number;
-  #callback: Deno.UnsafeCallback;
+  #callback: MidiCallback;
   #closed = false;
 
   #ccListeners = new Set<Listener<CCEvent>>();
@@ -47,7 +47,7 @@ export class MidiInput {
   #noteListeners = new Set<Listener<NoteEvent>>();
   #tickListeners = new Set<Listener<TickPayload>>();
 
-  constructor(lib: MidiBridgeLibrary, handle: number, callback: Deno.UnsafeCallback) {
+  constructor(lib: MidiBridgeLibrary, handle: number, callback: MidiCallback) {
     this.#lib = lib;
     this.#handle = handle;
     this.#callback = callback;

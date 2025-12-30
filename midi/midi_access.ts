@@ -1,12 +1,12 @@
 import { CALLBACK_DEF, openLibrary, readPortList, withPortId } from "./ffi.ts";
-import type { MidiBridgeLibrary } from "./ffi.ts";
+import type { MidiBridgeLibrary, MidiCallback } from "./ffi.ts";
 import type { PortInfo } from "./types.ts";
 import type { MidiInputOptions } from "./midi_input.ts";
 import { MidiInput } from "./midi_input.ts";
 import { MidiOutput } from "./midi_output.ts";
 
 export type MidiAccessOptions = {
-  libPath: string;
+  libPath?: string;
 };
 
 export class MidiAccess {
@@ -16,7 +16,7 @@ export class MidiAccess {
     this.#lib = lib;
   }
 
-  static open(options: MidiAccessOptions) {
+  static open(options: MidiAccessOptions = {}) {
     return new MidiAccess(openLibrary(options.libPath));
   }
 
@@ -34,9 +34,10 @@ export class MidiAccess {
 
   openInput(portId: string, options: MidiInputOptions = {}) {
     let handler: (bytes: Uint8Array) => void = () => {};
-    const callback = Deno.UnsafeCallback.threadSafe(CALLBACK_DEF, (ptr, len) => {
+    const callback: MidiCallback = Deno.UnsafeCallback.threadSafe(CALLBACK_DEF, (ptr, len) => {
       try {
-        const bytes = new Uint8Array(len);
+        if (ptr === null) return;
+        const bytes = new Uint8Array(Number(len));
         Deno.UnsafePointerView.copyInto(ptr, bytes);
         handler(bytes);
       } catch (err) {

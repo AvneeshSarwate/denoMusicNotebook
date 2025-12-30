@@ -17,6 +17,4 @@ case "$uname_out" in
  esac
 
 lib_name="libmidi_bridge.${ext}"
-cp "$root_dir/native/midi_bridge/target/release/$lib_name" "$root_dir/native/$lib_name"
-
-echo "Built $root_dir/native/$lib_name"
+echo "Built $root_dir/native/midi_bridge/target/release/$lib_name"
