@@ -1,4 +1,6 @@
 import type { Scale } from "./scale.ts";
+import type { CurveValue } from "./curveValue.ts";
+import { cloneCurveValue } from "./curveValue.ts";
 
 //todo api - consolidate AbletonNote/Clip type def with the one in alsParsing.ts
 export type AbletonNote<T = any> = { 
@@ -9,7 +11,12 @@ export type AbletonNote<T = any> = {
   probability: number,
   position: number,
   isEnabled: boolean,
-  metadata?: T
+  metadata?: T,
+  noteId?: string,
+  velocityDeviation?: number,
+  pitchCurve?: CurveValue[],
+  pressureCurve?: CurveValue[],
+  timbreCurve?: CurveValue[]
 }
 // export type AbletonClip = { name: string, duration: number, notes: AbletonNote[] }
 export const quickNote = <T = any>(pitch: number, duration: number, velocity: number, position: number, metadata?: T): AbletonNote<T> => {
@@ -47,6 +54,12 @@ function positionsToDeltas(positions: number[], totalTime?: number) {
 
 type NoteWithDelta = { note: AbletonNote, preDelta: number, postDelta?: number }
 
+function scaleCurveOffsets(note: AbletonNote, factor: number) {
+  if (note.pitchCurve) note.pitchCurve.forEach((cv) => cv.timeOffset *= factor);
+  if (note.pressureCurve) note.pressureCurve.forEach((cv) => cv.timeOffset *= factor);
+  if (note.timbreCurve) note.timbreCurve.forEach((cv) => cv.timeOffset *= factor);
+}
+
 export class AbletonClip {
   name: string;
   duration: number;
@@ -77,7 +90,12 @@ export class AbletonClip {
   }
 
   clone(): AbletonClip {
-    const noteClone = this.notes.map(note => ({ ...note }));
+    const noteClone = this.notes.map(note => ({
+      ...note,
+      pitchCurve: note.pitchCurve ? note.pitchCurve.map(cloneCurveValue) : undefined,
+      pressureCurve: note.pressureCurve ? note.pressureCurve.map(cloneCurveValue) : undefined,
+      timbreCurve: note.timbreCurve ? note.timbreCurve.map(cloneCurveValue) : undefined,
+    }));
     return new AbletonClip(this.name, this.duration, noteClone);
   }
 
@@ -87,6 +105,7 @@ export class AbletonClip {
     clone.notes.forEach(note => {
       note.position *= factor;
       note.duration *= factor;
+      scaleCurveOffsets(note, factor);
     });
     clone.duration *= factor;
     return clone;
@@ -121,6 +140,9 @@ export class AbletonClip {
 
   timeSlice(start: number, end: number): AbletonClip {
     const clone = this.clone();
+    const originalDurations = new Map<AbletonNote, number>();
+    clone.notes.forEach((note) => originalDurations.set(note, note.duration));
+
     clone.notes = clone.notes.filter(note => note.position + note.duration >= start && note.position <= end)
     clone.notes.filter(note => note.position + note.duration > end).forEach(note => note.duration = end - note.position)
 
@@ -131,6 +153,14 @@ export class AbletonClip {
 
     //filter out notes with duration <= 0
     clone.notes = clone.notes.filter(note => note.duration > 0)
+
+    clone.notes.forEach((note) => {
+      const original = originalDurations.get(note) ?? note.duration;
+      if (original > 0 && note.duration !== original) {
+        const factor = note.duration / original;
+        scaleCurveOffsets(note, factor);
+      }
+    });
 
     clone.duration = end - start
     return clone
