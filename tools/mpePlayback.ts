@@ -90,6 +90,7 @@ export function launchCurve(
   const stepSec = resolved.curveStepMs / 1000;
   const gap = resolved.noteGap;
   const gappedVals = curveVals.map((cv) => ({ ...cv, timeOffset: cv.timeOffset * gap }));
+  const durationBeats = duration * gap;
 
   const task = ctx.branch(async (branchCtx) => {
     if (gappedVals.length === 1) {
@@ -97,13 +98,12 @@ export function launchCurve(
       return;
     }
 
-    const startTime = branchCtx.progTime;
-    let elapsed = 0;
-    while (elapsed < duration * gap) {
-      const curveVal = curve2val(elapsed, gappedVals);
+    while (true) {
+      const elapsedBeats = branchCtx.progBeats;
+      if (elapsedBeats >= durationBeats) break;
+      const curveVal = curve2val(elapsedBeats, gappedVals);
       sendCurveValue(noteRef, curveType, curveVal, resolved);
       await branchCtx.waitSec(stepSec);
-      elapsed = branchCtx.progTime - startTime;
     }
   }, `curve-${curveType}`);
 
@@ -146,7 +146,7 @@ export async function playMPENote(
   ].filter(Boolean) as { cancel: () => void }[];
 
   const noteOffTask = ctx.branch(async (branchCtx) => {
-    await branchCtx.waitSec(note.duration * resolved.noteGap);
+    await branchCtx.wait(note.duration * resolved.noteGap);
     noteRef.noteOff(note.offVelocity ?? note.velocity);
   }, "note-off");
 
@@ -183,10 +183,10 @@ export function playMPEClip(
         note = modified;
       }
 
-      const currentTime = branchCtx.progTime;
+      const currentBeats = branchCtx.progBeats;
       const noteStart = note.position;
-      if (noteStart > currentTime) {
-        await branchCtx.waitSec(noteStart - currentTime);
+      if (noteStart > currentBeats) {
+        await branchCtx.wait(noteStart - currentBeats);
       }
 
       const handle = await playMPENote(branchCtx, note, mpeDevice, resolved);
@@ -194,9 +194,9 @@ export function playMPEClip(
     }
 
     if (options.waitForCompletion !== false) {
-      const remaining = clip.duration - branchCtx.progTime;
+      const remaining = clip.duration - branchCtx.progBeats;
       if (remaining > 0) {
-        await branchCtx.waitSec(remaining);
+        await branchCtx.wait(remaining);
       }
     }
   }, "mpe-clip");
