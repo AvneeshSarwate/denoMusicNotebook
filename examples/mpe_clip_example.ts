@@ -51,7 +51,7 @@ try {
   await launch(async (ctx) => {
     ctx.setBpm(120);
     await playMPEClip(clip, ctx, mpeDevice, {
-      pitchBendRange: 48,
+      pitchBendRange: 96, //96 for bitwig, 48 for ableton (but ableton is buggy and needs max to bounce midi)
       curveStepMs: 10,
       noteGap: 0.975,
     }).promise;
