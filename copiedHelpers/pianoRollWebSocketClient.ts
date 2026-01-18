@@ -29,6 +29,14 @@ export interface NoteData {
   readonly position: number
   readonly duration: number
   readonly velocity: number // 0-127
+  readonly mpePitch?: {
+    readonly points: ReadonlyArray<{
+      readonly time: number
+      readonly pitchOffset: number
+      readonly metadata?: Readonly<Record<string, unknown>>
+      readonly rooted?: boolean
+    }>
+  }
   readonly metadata?: Readonly<Record<string, unknown>>
 }
 
@@ -38,6 +46,14 @@ export interface NoteDataInput {
   readonly position: number
   readonly duration: number
   readonly velocity?: number // 0-127, defaults to 100 if omitted
+  readonly mpePitch?: {
+    readonly points: ReadonlyArray<{
+      readonly time: number
+      readonly pitchOffset: number
+      readonly metadata?: Readonly<Record<string, unknown>>
+      readonly rooted?: boolean
+    }>
+  }
   readonly metadata?: Readonly<Record<string, unknown>>
 }
 

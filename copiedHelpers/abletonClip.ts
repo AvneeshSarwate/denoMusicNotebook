@@ -6,6 +6,8 @@ export type CurveValue = {
   y1: number;
   x2: number;
   y2: number;
+  rooted?: boolean;
+  metadata?: any;
 };
 
 export function createCurveValue(timeOffset: number, value: number, x1 = 0.5, y1 = 0.5, x2 = 0.5, y2 = 0.5): CurveValue {
@@ -16,6 +18,22 @@ export function cloneCurveValue(cv: CurveValue): CurveValue {
   return { ...cv };
 }
 
+export type PianoRollMpePoint = {
+  time: number;
+  pitchOffset: number;
+  metadata?: any;
+  rooted?: boolean;
+};
+
+export type PianoRollNoteLike = {
+  id?: string;
+  pitch: number;
+  position: number;
+  duration: number;
+  velocity: number;
+  mpePitch?: { points: ReadonlyArray<PianoRollMpePoint> };
+  metadata?: any;
+};
 
 //todo api - consolidate AbletonNote/Clip type def with the one in alsParsing.ts
 export type AbletonNote<T = any> = { 
@@ -75,25 +93,45 @@ function positionsToDeltas(positions: number[], totalTime?: number) {
 
 type NoteWithDelta = { note: AbletonNote, preDelta: number, postDelta?: number }
 
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
 function scaleCurveOffsets(note: AbletonNote, factor: number) {
   if (note.pitchCurve) note.pitchCurve.forEach((cv) => cv.timeOffset *= factor);
   if (note.pressureCurve) note.pressureCurve.forEach((cv) => cv.timeOffset *= factor);
   if (note.timbreCurve) note.timbreCurve.forEach((cv) => cv.timeOffset *= factor);
 }
 
-type MpeCurveValue = CurveValue & { rooted?: boolean };
+type MpeCurveValue = CurveValue & { rooted?: boolean; metadata?: any };
+
+type NormalizedPitchPoint = {
+  time: number;
+  pitchOffset: number;
+  rooted?: boolean;
+};
 
 type RootedPitchSegment = {
-  startIndex: number;
-  endIndex: number;
   startTime: number;
   endTime: number;
   roundedPitch: number;
   shiftAbs: number;
 };
 
-function buildRootedPitchSegments(
+function toNormalizedPitchPoints(
   pitchCurve: MpeCurveValue[],
+  duration: number,
+): NormalizedPitchPoint[] {
+  const denom = duration > 0 ? duration : 1;
+  return pitchCurve.map((point) => ({
+    time: point.timeOffset / denom,
+    pitchOffset: point.value,
+    rooted: point.rooted,
+  }));
+}
+
+function buildRootedPitchSegments(
+  points: NormalizedPitchPoint[],
   basePitch: number,
   baseIndex: number,
   newBaseIndex: number,
@@ -117,25 +155,22 @@ function buildRootedPitchSegments(
     current = null;
   };
 
-  for (let i = 0; i < pitchCurve.length; i++) {
-    const point = pitchCurve[i];
+  for (let i = 0; i < points.length; i++) {
+    const point = points[i];
     if (!point.rooted) {
       finalize();
       continue;
     }
-    const roundedPitch = Math.round(basePitch + point.value);
+    const roundedPitch = Math.round(basePitch + point.pitchOffset);
     if (!current || roundedPitch !== current.roundedPitch) {
       finalize();
       current = {
-        startIndex: i,
-        endIndex: i,
-        startTime: point.timeOffset,
-        endTime: point.timeOffset,
+        startTime: point.time,
+        endTime: point.time,
         roundedPitch,
       };
     } else {
-      current.endIndex = i;
-      current.endTime = point.timeOffset;
+      current.endTime = point.time;
     }
   }
   finalize();
@@ -143,28 +178,79 @@ function buildRootedPitchSegments(
   return segments;
 }
 
-function shiftForTime(timeOffset: number, segments: RootedPitchSegment[]): number {
+function shiftForTime(time: number, segments: RootedPitchSegment[]): number {
   if (segments.length === 0) return 0;
   const first = segments[0];
-  if (timeOffset <= first.startTime) return first.shiftAbs;
+  if (time <= first.startTime) return first.shiftAbs;
   const last = segments[segments.length - 1];
-  if (timeOffset >= last.endTime) return last.shiftAbs;
+  if (time >= last.endTime) return last.shiftAbs;
 
   for (let i = 0; i < segments.length; i++) {
     const seg = segments[i];
-    if (timeOffset >= seg.startTime && timeOffset <= seg.endTime) {
+    if (time >= seg.startTime && time <= seg.endTime) {
       return seg.shiftAbs;
     }
     const next = segments[i + 1];
-    if (next && timeOffset > seg.endTime && timeOffset < next.startTime) {
+    if (next && time > seg.endTime && time < next.startTime) {
       const span = next.startTime - seg.endTime;
       if (span <= 0) return next.shiftAbs;
-      const lerp = (timeOffset - seg.endTime) / span;
+      const lerp = (time - seg.endTime) / span;
       return seg.shiftAbs + lerp * (next.shiftAbs - seg.shiftAbs);
     }
   }
 
   return last.shiftAbs;
+}
+
+export function pianoRollNoteToAbletonNote(note: PianoRollNoteLike): AbletonNote {
+  const curvePoints = note.mpePitch?.points ?? [];
+  const pitchCurve = curvePoints.length
+    ? curvePoints.map((point) => ({
+        timeOffset: (note.duration ?? 0) * clamp01(point.time),
+        value: point.pitchOffset,
+        x1: 0.5,
+        y1: 0.5,
+        x2: 0.5,
+        y2: 0.5,
+        rooted: point.rooted,
+        metadata: point.metadata,
+      }))
+    : undefined;
+
+  return {
+    pitch: note.pitch,
+    duration: note.duration,
+    velocity: note.velocity,
+    offVelocity: note.velocity,
+    probability: 1,
+    position: note.position,
+    isEnabled: true,
+    metadata: note.metadata,
+    pitchCurve,
+  };
+}
+
+export function abletonNoteToPianoRollNote(note: AbletonNote, id?: string): PianoRollNoteLike {
+  const duration = note.duration ?? 0;
+  const pitchCurve = note.pitchCurve as MpeCurveValue[] | undefined;
+  const points = pitchCurve?.length
+    ? pitchCurve.map((point) => ({
+        time: duration > 0 ? clamp01(point.timeOffset / duration) : 0,
+        pitchOffset: point.value,
+        rooted: point.rooted,
+        metadata: point.metadata,
+      }))
+    : undefined;
+
+  return {
+    id: id ?? note.noteId,
+    pitch: note.pitch,
+    position: note.position,
+    duration: note.duration,
+    velocity: note.velocity,
+    mpePitch: points ? { points } : undefined,
+    metadata: note.metadata,
+  };
 }
 
 export function scaleTransposeMPE(note: AbletonNote, transpose: number, scale: Scale): AbletonNote {
@@ -184,17 +270,16 @@ export function scaleTransposeMPE(note: AbletonNote, transpose: number, scale: S
   const pitchCurve = clone.pitchCurve as MpeCurveValue[] | undefined;
   if (!pitchCurve || pitchCurve.length === 0) return clone;
 
-  const baseShift = newBasePitch - basePitch;
-  let segments = buildRootedPitchSegments(pitchCurve, basePitch, baseIndex, newBaseIndex, scale);
+  const normalizedPoints = toNormalizedPitchPoints(pitchCurve, clone.duration);
+  let segments = buildRootedPitchSegments(normalizedPoints, basePitch, baseIndex, newBaseIndex, scale);
   if (segments.length === 0) {
     return clone;
   }
 
+  const baseShift = newBasePitch - basePitch;
   if (segments[0].startTime > 0) {
     segments = [
       {
-        startIndex: -1,
-        endIndex: -1,
         startTime: 0,
         endTime: 0,
         roundedPitch: Math.round(basePitch),
@@ -205,8 +290,9 @@ export function scaleTransposeMPE(note: AbletonNote, transpose: number, scale: S
   }
 
   const baseDelta = basePitch - newBasePitch;
-  pitchCurve.forEach((point) => {
-    const shiftAbs = shiftForTime(point.timeOffset, segments);
+  pitchCurve.forEach((point, idx) => {
+    const time = normalizedPoints[idx]?.time ?? 0;
+    const shiftAbs = shiftForTime(time, segments);
     point.value = point.value + baseDelta + shiftAbs;
   });
 

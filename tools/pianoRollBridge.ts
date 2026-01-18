@@ -24,7 +24,12 @@ import {
   type NoteDataInput,
   type NoteData
 } from "../copiedHelpers/pianoRollWebSocketClient.ts"
-import { AbletonClip, type AbletonNote } from "../copiedHelpers/AbletonClip.ts"
+import {
+  AbletonClip,
+  type AbletonNote,
+  abletonNoteToPianoRollNote,
+  pianoRollNoteToAbletonNote
+} from "../copiedHelpers/AbletonClip.ts"
 
 // ============================================================================
 // Type Definitions
@@ -112,14 +117,14 @@ function ensureStableNoteId(note: AbletonNote, index: number): string {
  * Generates unique IDs for each note.
  */
 function abletonToNoteData(notes: AbletonNote[]): NoteDataInput[] {
-  return notes.map((note, index) => ({
-    id: ensureStableNoteId(note, index),
-    pitch: note.pitch,
-    position: note.position,
-    duration: note.duration,
-    velocity: note.velocity,
-    metadata: note.metadata
-  }))
+  return notes.map((note, index) => {
+    const id = ensureStableNoteId(note, index)
+    const pianoNote = abletonNoteToPianoRollNote(note, id)
+    return {
+      ...pianoNote,
+      id
+    }
+  })
 }
 
 /**
@@ -127,16 +132,13 @@ function abletonToNoteData(notes: AbletonNote[]): NoteDataInput[] {
  * Uses default values for fields not in piano roll (offVelocity, probability, isEnabled).
  */
 function noteDataToAbleton(notes: readonly NoteData[]): AbletonNote[] {
-  return notes.map(note => ({
-    pitch: note.pitch,
-    position: note.position,
-    duration: note.duration,
-    velocity: note.velocity,
-    offVelocity: note.velocity, // Default: same as velocity
-    probability: 1,              // Default: always play
-    isEnabled: true,             // Default: enabled
-    metadata: normalizeMetadataWithId(note.metadata, note.id)
-  }))
+  return notes.map(note => {
+    const abletonNote = pianoRollNoteToAbletonNote(note)
+    return {
+      ...abletonNote,
+      metadata: normalizeMetadataWithId(note.metadata, note.id)
+    }
+  })
 }
 
 // ============================================================================

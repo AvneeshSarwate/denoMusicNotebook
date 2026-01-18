@@ -5,6 +5,8 @@ export type CurveValue = {
   y1: number;
   x2: number;
   y2: number;
+  rooted?: boolean;
+  metadata?: any;
 };
 
 export function createCurveValue(timeOffset: number, value: number, x1 = 0.5, y1 = 0.5, x2 = 0.5, y2 = 0.5): CurveValue {
