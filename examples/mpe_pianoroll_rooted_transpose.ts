@@ -7,7 +7,7 @@ import { MPEDevice } from "@/midi/mpe_device.ts";
 import { launch } from "@/copiedHelpers/offline_time_context.ts";
 import { AbletonWatcher } from "@/tools/abletonWatcher.ts";
 import { playMPEClip } from "@/tools/mpePlayback.ts";
-import { ClipMap, showBoundMelody } from "@/tools/pianoRollBridge.ts";
+import { createPianoRollBridge } from "@/tools/pianoRollAdapter.ts";
 import { AbletonClip, scaleTransposeMPE } from "@/copiedHelpers/abletonClip.ts";
 import { Scale } from "@/copiedHelpers/scale.ts";
 
@@ -29,9 +29,9 @@ if (!original) {
   throw new Error(`Clip not found: ${CLIP_NAME} (or track 1 / slot 1)`);
 }
 
-const clipMap = new ClipMap();
-clipMap.set("mpe_edit", original);
-const handle = showBoundMelody(clipMap, "mpe_edit");
+const piano = createPianoRollBridge();
+piano.clips.set("mpe_edit", original);
+const handle = piano.showBound("mpe_edit");
 
 console.log("Edit the clip in the piano roll:");
 console.log("1) Toggle MPE mode");
