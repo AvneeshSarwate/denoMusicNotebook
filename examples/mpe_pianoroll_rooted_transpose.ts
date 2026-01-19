@@ -2,14 +2,14 @@
 // scale-transpose the annotated MPE clip, then play it back with playMPEClip.
 // Notebook-friendly: run this file top-to-bottom, or split into cells.
 
-import { MidiAccess } from "../midi/mod.ts";
-import { MPEDevice } from "../midi/mpe_device.ts";
-import { launch } from "../copiedHelpers/offline_time_context.ts";
-import { AbletonWatcher } from "../tools/abletonWatcher.ts";
-import { playMPEClip } from "../tools/mpePlayback.ts";
-import { ClipMap, showBoundMelody } from "../tools/pianoRollBridge.ts";
-import { AbletonClip, scaleTransposeMPE } from "../copiedHelpers/abletonClip.ts";
-import { Scale } from "../copiedHelpers/scale.ts";
+import { MidiAccess } from "@/midi/mod.ts";
+import { MPEDevice } from "@/midi/mpe_device.ts";
+import { launch } from "@/copiedHelpers/offline_time_context.ts";
+import { AbletonWatcher } from "@/tools/abletonWatcher.ts";
+import { playMPEClip } from "@/tools/mpePlayback.ts";
+import { ClipMap, showBoundMelody } from "@/tools/pianoRollBridge.ts";
+import { AbletonClip, scaleTransposeMPE } from "@/copiedHelpers/abletonClip.ts";
+import { Scale } from "@/copiedHelpers/scale.ts";
 
 // ======================================================================
 // 1) Configure paths + MIDI output selection
